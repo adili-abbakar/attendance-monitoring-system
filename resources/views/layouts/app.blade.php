@@ -1,5 +1,8 @@
 @extends('layouts.base')
 
 @section('content')
-    @yield('page-content')
+
+    <body class="bg-gray-50">
+        @yield('page-content')
+    </body>
 @endsection
