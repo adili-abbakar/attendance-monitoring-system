@@ -7,6 +7,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class Admin extends Model
 {
-    /** @use HasFactory<\Database\Factories\AdminFactory> */
     use HasFactory;
+
+    protected $primaryKey = 'user_id';
+
+    public $incrementing = false;
+
+    protected $keyType = 'int';
+
+    protected $fillable = [
+        'user_id',
+    ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

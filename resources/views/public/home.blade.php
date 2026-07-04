@@ -93,7 +93,7 @@
             <div class="flex-1 flex items-center justify-center">
                 <div class="flex items-center gap-2">
                     <div
-                        class="w-8 h-8 bg-gradient-to-br from-teal-500 to-green-600 rounded-lg flex items-center justify-center">
+                        class="w-8 h-8 bg-linear-to-br from-teal-500 to-green-600 rounded-lg flex items-center justify-center">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                         </svg>
@@ -387,7 +387,7 @@
                         </div>
 
                         <!-- Quick Actions -->
-                        <div class="bg-gradient-to-br from-teal-500 to-green-600 rounded-lg p-6 text-white">
+                        <div class="bg-linear-to-br from-teal-500 to-green-600 rounded-lg p-6 text-white">
                             <h3 class="font-bold text-lg mb-4">Quick Actions</h3>
                             <div class="space-y-3">
                                 <a href="qr-scanner.html"
