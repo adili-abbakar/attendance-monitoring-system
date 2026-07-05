@@ -18,8 +18,8 @@
 
     <!-- Navigation -->
     <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
-        <a href="dashboard.html"
-            class="flex items-center gap-3 px-4 py-3 bg-teal-50 text-teal-700 rounded-lg font-medium transition-colors">
+        <a href="{{ route('home') }}"
+            class="flex items-center gap-3 px-4 py-3 {{ request()->routeIs('home') ? 'bg-teal-50 text-teal-700' : ' text-gray-700 rounded-lg hover:bg-gray-100' }} rounded-lg font-medium transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M3 12l2-3m0 0l7-4 7 4M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9m-9 11l4-4m0 0l4 4m-4-4v4"></path>
@@ -42,8 +42,8 @@
             </svg>
             Attendance
         </a>
-        <a href="students.html"
-            class="flex items-center gap-3 px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors">
+        <a href="{{ route('students.index') }}"
+            class="flex items-center  {{ request()->routeIs('students.index') ? 'bg-teal-50 text-teal-700' : ' text-gray-700 rounded-lg hover:bg-gray-100' }} gap-3 px-4 py-3 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                     d="M12 4.354a4 4 0 110 5.292M15 12H9m6 0a6 6 0 11-12 0 6 6 0 0112 0z"></path>
@@ -71,28 +71,33 @@
                 </button>
             </form>
         @endauth
-        @guest
+
+    </nav>
+
+    @auth <!-- User Section -->
+        <div class="p-4 border-t border-gray-200">
+            <a href="profile.html" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
+                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=40&h=40&fit=crop" alt="User"
+                    class="w-10 h-10 rounded-full object-cover">
+                <div class="flex-1">
+                    <p class="text-sm font-medium text-gray-900">{{ auth()->user()->name }}</p>
+                    <p class="text-xs text-gray-500">{{ ucwords(auth()->user()->role) }}</p>
+                </div>
+            </a>
+        </div>
+    @endauth
+
+    @guest
+        <div class="p-4 border-t border-gray-200">
             <a href="{{ 'login' }}"
                 class="flex items-center gap-3 px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                        d="M17 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5m0 0l-5-5m5 5H3">
                     </path>
                 </svg>
                 Login
             </a>
-        @endguest
-    </nav>
-
-    <!-- User Section -->
-    <div class="p-4 border-t border-gray-200">
-        <a href="profile.html" class="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 transition-colors">
-            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=40&h=40&fit=crop" alt="User"
-                class="w-10 h-10 rounded-full object-cover">
-            <div class="flex-1">
-                <p class="text-sm font-medium text-gray-900">Dr. Sarah Anderson</p>
-                <p class="text-xs text-gray-500">Lecturer</p>
-            </div>
-        </a>
-    </div>
+        </div>
+    @endguest
 </aside>
