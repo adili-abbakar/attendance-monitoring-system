@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
 {
@@ -17,6 +19,7 @@ class User extends Authenticatable
         'password',
         'role',
         'status',
+        'firebase_uid',
     ];
 
     protected $hidden = [
@@ -33,18 +36,48 @@ class User extends Authenticatable
         ];
     }
 
-    public function admin()
+    public function admin(): HasOne
     {
         return $this->hasOne(Admin::class);
     }
 
-    public function lecturer()
+    public function lecturer(): HasOne
     {
         return $this->hasOne(Lecturer::class);
     }
 
-    public function student()
+    public function student(): HasOne
     {
         return $this->hasOne(Student::class);
+    }
+
+    public function courses(): HasMany
+    {
+        return $this->hasMany(Course::class, 'lecturer_id');
+    }
+
+    public function lectureSessions(): HasMany
+    {
+        return $this->hasMany(LectureSession::class, 'lecturer_id');
+    }
+
+    public function attendanceRecords(): HasMany
+    {
+        return $this->hasMany(AttendanceRecord::class, 'lecturer_id');
+    }
+
+    public function enrolments(): HasMany
+    {
+        return $this->hasMany(Enrolment::class, 'lecturer_id');
+    }
+
+    public function studentEnrolments(): HasMany
+    {
+        return $this->hasMany(Enrolment::class, 'student_id');
+    }
+
+    public function studentAttendanceRecords(): HasMany
+    {
+        return $this->hasMany(AttendanceRecord::class, 'student_id');
     }
 }
