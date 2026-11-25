@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,7 +28,7 @@ class Course extends Model
     protected function casts(): array
     {
         return [
-            'record_uuid' => 'uuid',
+            'record_uuid' => Uuid::class,
             'is_active' => 'boolean',
             'semester' => 'integer',
             'schema_version' => 'integer',

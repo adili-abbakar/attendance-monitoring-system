@@ -9,46 +9,46 @@ use App\Models\LectureSession;
 use App\Models\AttendanceRecord;
 use App\Models\Enrolment;
 use App\Models\SyncDevice;
-use App\Services\FirebaseAuthService;
+use Laravel\Sanctum\PersonalAccessToken;
 use Illuminate\Support\Str;
 
-beforeEach(function () {
-    $this->firebaseAuthService = Mockery::mock(FirebaseAuthService::class);
-    $this->app->instance(FirebaseAuthService::class, $this->firebaseAuthService);
-});
-
-function makeLecturerUser(string $firebaseUid, string $email = null): array
+function makeLecturerUser(string $email = null): array
 {
     $user = User::factory()->create([
         'role' => 'lecturer',
         'status' => true,
-        'firebase_uid' => $firebaseUid,
-        'email' => $email ?? "{$firebaseUid}@example.com",
+        'email' => $email ?? 'lecturer-' . Str::random(8) . '@example.com',
         'name' => 'Test Lecturer',
+        'password' => bcrypt('password'),
     ]);
     $lecturer = Lecturer::factory()->create(['user_id' => $user->id]);
 
     return ['user' => $user, 'lecturer' => $lecturer];
 }
 
+function makeLecturerUserWithToken(string $email = null): array
+{
+    $data = makeLecturerUser($email);
+    $token = $data['user']->createToken('test-token')->plainTextToken;
+
+    return ['user' => $data['user'], 'lecturer' => $data['lecturer'], 'token' => $token];
+}
+
+function authHeaders(string $token): array
+{
+    return ['Authorization' => 'Bearer ' . $token];
+}
+
 describe('SyncController - upsertCourse', function () {
 
     test('creates a new course with source_revision 1', function () {
-        $data = makeLecturerUser('course-creator-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
 
-        $verifiedToken = [
-            'uid' => 'course-creator-uid',
-            'email' => 'course-creator-uid@example.com',
-            'email_verified' => true,
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
         $courseId = Str::uuid()->toString();
 
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/upsert-course', [
                 'course_id' => $courseId,
                 'record_uuid' => $courseId,
@@ -85,18 +85,11 @@ describe('SyncController - upsertCourse', function () {
     });
 
     test('rejects create with source_revision != 1', function () {
-        $data = makeLecturerUser('course-creator-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
 
-        $verifiedToken = [
-            'uid' => 'course-creator-uid',
-            'email' => 'course-creator-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/upsert-course', [
                 'course_id' => Str::uuid()->toString(),
                 'record_uuid' => Str::uuid()->toString(),
@@ -113,7 +106,7 @@ describe('SyncController - upsertCourse', function () {
     });
 
     test('updates existing course with incrementing source_revision', function () {
-        $data = makeLecturerUser('course-updater-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
 
@@ -127,14 +120,7 @@ describe('SyncController - upsertCourse', function () {
             'change_version' => 1,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'course-updater-uid',
-            'email' => 'course-updater-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/upsert-course', [
                 'course_id' => $course->record_uuid,
                 'record_uuid' => $course->record_uuid,
@@ -163,7 +149,7 @@ describe('SyncController - upsertCourse', function () {
     });
 
     test('returns idempotent replay when source_revision matches current change_version', function () {
-        $data = makeLecturerUser('course-replay-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
 
@@ -177,14 +163,7 @@ describe('SyncController - upsertCourse', function () {
             'change_version' => 3,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'course-replay-uid',
-            'email' => 'course-replay-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/upsert-course', [
                 'course_id' => $course->record_uuid,
                 'record_uuid' => $course->record_uuid,
@@ -205,8 +184,8 @@ describe('SyncController - upsertCourse', function () {
     });
 
     test('rejects update from wrong lecturer', function () {
-        $owner = makeLecturerUser('course-owner-uid');
-        $attacker = makeLecturerUser('course-attacker-uid');
+        $owner = makeLecturerUserWithToken();
+        $attacker = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
 
@@ -220,14 +199,7 @@ describe('SyncController - upsertCourse', function () {
             'change_version' => 1,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'course-attacker-uid',
-            'email' => 'course-attacker-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($attacker['token']))
             ->postJson('/api/v1/sync/upsert-course', [
                 'course_id' => $course->record_uuid,
                 'record_uuid' => $course->record_uuid,
@@ -240,14 +212,14 @@ describe('SyncController - upsertCourse', function () {
                 'source_revision' => 2,
             ]);
 
-        $response->assertStatus(400);
+        $response->assertStatus(403);
     });
 });
 
 describe('SyncController - upsertLectureSession', function () {
 
     test('creates a new lecture session', function () {
-        $data = makeLecturerUser('session-creator-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -259,16 +231,9 @@ describe('SyncController - upsertLectureSession', function () {
             'lecturer_id' => $data['user']->id,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'session-creator-uid',
-            'email' => 'session-creator-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
         $recordUuid = Str::uuid()->toString();
 
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/upsert-lecture-session', [
                 'record_uuid' => $recordUuid,
                 'course_id' => $course->record_uuid,
@@ -298,16 +263,9 @@ describe('SyncController - upsertLectureSession', function () {
     });
 
     test('rejects lecture session for non-existent course', function () {
-        $data = makeLecturerUser('session-bad-course-uid');
+        $data = makeLecturerUserWithToken();
 
-        $verifiedToken = [
-            'uid' => 'session-bad-course-uid',
-            'email' => 'session-bad-course-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/upsert-lecture-session', [
                 'record_uuid' => Str::uuid()->toString(),
                 'course_id' => Str::uuid()->toString(),
@@ -328,7 +286,7 @@ describe('SyncController - upsertLectureSession', function () {
 describe('SyncController - createAttendanceRecord', function () {
 
     test('creates a new attendance record', function () {
-        $data = makeLecturerUser('attendance-creator-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -344,21 +302,15 @@ describe('SyncController - createAttendanceRecord', function () {
             'course_id' => $course->id,
             'lecturer_id' => $data['user']->id,
         ]);
-        $studentUser = User::factory()->create([
-            'role' => 'student',
-            'status' => true,
+        $studentUser = User::factory()->student()->create();
+        $student = \App\Models\Student::factory()->create([
+            'user_id' => $studentUser->id,
+            'record_uuid' => Str::uuid(),
         ]);
-
-        $verifiedToken = [
-            'uid' => 'attendance-creator-uid',
-            'email' => 'attendance-creator-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
 
         $recordUuid = Str::uuid()->toString();
 
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/create-attendance-record', [
                 'record_uuid' => $recordUuid,
                 'lecture_session_id' => $lectureSession->record_uuid,
@@ -382,7 +334,7 @@ describe('SyncController - createAttendanceRecord', function () {
     });
 
     test('rejects attendance record for non-existent student', function () {
-        $data = makeLecturerUser('attendance-bad-student-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -399,14 +351,7 @@ describe('SyncController - createAttendanceRecord', function () {
             'lecturer_id' => $data['user']->id,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'attendance-bad-student-uid',
-            'email' => 'attendance-bad-student-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/create-attendance-record', [
                 'record_uuid' => Str::uuid()->toString(),
                 'lecture_session_id' => $lectureSession->record_uuid,
@@ -423,7 +368,7 @@ describe('SyncController - createAttendanceRecord', function () {
 describe('SyncController - deleteCourse', function () {
 
     test('deletes a course owned by the lecturer', function () {
-        $data = makeLecturerUser('delete-course-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -435,14 +380,7 @@ describe('SyncController - deleteCourse', function () {
             'lecturer_id' => $data['user']->id,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'delete-course-uid',
-            'email' => 'delete-course-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->deleteJson('/api/v1/sync/delete-course', [
                 'course_id' => $course->record_uuid,
             ]);
@@ -461,16 +399,9 @@ describe('SyncController - deleteCourse', function () {
     });
 
     test('returns 404 for non-existent course', function () {
-        $data = makeLecturerUser('delete-missing-uid');
+        $data = makeLecturerUserWithToken();
 
-        $verifiedToken = [
-            'uid' => 'delete-missing-uid',
-            'email' => 'delete-missing-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->deleteJson('/api/v1/sync/delete-course', [
                 'course_id' => Str::uuid()->toString(),
             ]);
@@ -482,7 +413,7 @@ describe('SyncController - deleteCourse', function () {
 describe('SyncController - deleteLectureSession', function () {
 
     test('deletes a lecture session owned by the lecturer', function () {
-        $data = makeLecturerUser('delete-session-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -499,14 +430,7 @@ describe('SyncController - deleteLectureSession', function () {
             'lecturer_id' => $data['user']->id,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'delete-session-uid',
-            'email' => 'delete-session-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->deleteJson('/api/v1/sync/delete-lecture-session', [
                 'record_uuid' => $lectureSession->record_uuid,
             ]);
@@ -523,7 +447,7 @@ describe('SyncController - deleteLectureSession', function () {
 describe('SyncController - deleteAttendanceRecord', function () {
 
     test('deletes an attendance record owned by the lecturer', function () {
-        $data = makeLecturerUser('delete-attendance-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -546,14 +470,7 @@ describe('SyncController - deleteAttendanceRecord', function () {
             'lecturer_id' => $data['user']->id,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'delete-attendance-uid',
-            'email' => 'delete-attendance-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->deleteJson('/api/v1/sync/delete-attendance-record', [
                 'record_uuid' => $attendanceRecord->record_uuid,
             ]);
@@ -570,7 +487,7 @@ describe('SyncController - deleteAttendanceRecord', function () {
 describe('SyncController - enrolStudent', function () {
 
     test('enrols a student in a course', function () {
-        $data = makeLecturerUser('enrol-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -581,22 +498,15 @@ describe('SyncController - enrolStudent', function () {
             'academic_session_id' => $session->id,
             'lecturer_id' => $data['user']->id,
         ]);
-        $studentUser = User::factory()->create([
-            'role' => 'student',
-            'status' => true,
+        $studentUser = User::factory()->student()->create();
+        $student = \App\Models\Student::factory()->create([
+            'user_id' => $studentUser->id,
             'record_uuid' => Str::uuid()->toString(),
         ]);
 
-        $verifiedToken = [
-            'uid' => 'enrol-uid',
-            'email' => 'enrol-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
         $recordUuid = Str::uuid()->toString();
 
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/enrol-student', [
                 'record_uuid' => $recordUuid,
                 'course_id' => $course->record_uuid,
@@ -619,7 +529,7 @@ describe('SyncController - enrolStudent', function () {
     });
 
     test('rejects enrolment for non-existent student', function () {
-        $data = makeLecturerUser('enrol-bad-student-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -631,14 +541,7 @@ describe('SyncController - enrolStudent', function () {
             'lecturer_id' => $data['user']->id,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'enrol-bad-student-uid',
-            'email' => 'enrol-bad-student-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/enrol-student', [
                 'record_uuid' => Str::uuid()->toString(),
                 'course_id' => $course->record_uuid,
@@ -653,7 +556,7 @@ describe('SyncController - enrolStudent', function () {
 describe('SyncController - removeEnrolment', function () {
 
     test('removes an enrolment owned by the lecturer', function () {
-        $data = makeLecturerUser('remove-enrol-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         $course = Course::factory()->create([
@@ -671,14 +574,7 @@ describe('SyncController - removeEnrolment', function () {
             'lecturer_id' => $data['user']->id,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'remove-enrol-uid',
-            'email' => 'remove-enrol-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->deleteJson('/api/v1/sync/remove-enrolment', [
                 'record_uuid' => $enrolment->record_uuid,
             ]);
@@ -695,17 +591,10 @@ describe('SyncController - removeEnrolment', function () {
 describe('SyncController - registerDevice', function () {
 
     test('registers a new sync device', function () {
-        $data = makeLecturerUser('device-uid');
+        $data = makeLecturerUserWithToken();
         $deviceId = Str::uuid()->toString();
 
-        $verifiedToken = [
-            'uid' => 'device-uid',
-            'email' => 'device-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/register-device', [
                 'device_id' => $deviceId,
                 'device_info' => 'iPhone 15 Pro',
@@ -727,7 +616,7 @@ describe('SyncController - registerDevice', function () {
 describe('SyncController - advanceCheckpoint', function () {
 
     test('advances sync checkpoint for a device', function () {
-        $data = makeLecturerUser('checkpoint-uid');
+        $data = makeLecturerUserWithToken();
         $deviceId = Str::uuid()->toString();
         $cursor = Str::uuid()->toString();
 
@@ -737,14 +626,7 @@ describe('SyncController - advanceCheckpoint', function () {
             'schema_version' => 1,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'checkpoint-uid',
-            'email' => 'checkpoint-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/advance-checkpoint', [
                 'device_id' => $deviceId,
                 'collection_name' => 'courses',
@@ -769,7 +651,7 @@ describe('SyncController - advanceCheckpoint', function () {
 describe('SyncController - getChangeFeed', function () {
 
     test('returns change feed entries for the lecturer', function () {
-        $data = makeLecturerUser('changefeed-uid');
+        $data = makeLecturerUserWithToken();
         $level = Level::factory()->create();
         $session = AcademicSession::factory()->create();
         Course::factory()->create([
@@ -781,14 +663,7 @@ describe('SyncController - getChangeFeed', function () {
             'lecturer_id' => $data['user']->id,
         ]);
 
-        $verifiedToken = [
-            'uid' => 'changefeed-uid',
-            'email' => 'changefeed-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->getJson('/api/v1/sync/change-feed', [
                 'limit' => 10,
             ]);
@@ -801,16 +676,9 @@ describe('SyncController - getChangeFeed', function () {
     });
 
     test('filters change feed by collection_name', function () {
-        $data = makeLecturerUser('changefeed-filter-uid');
+        $data = makeLecturerUserWithToken();
 
-        $verifiedToken = [
-            'uid' => 'changefeed-filter-uid',
-            'email' => 'changefeed-filter-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->getJson('/api/v1/sync/change-feed', [
                 'collection_name' => 'courses',
             ]);
@@ -822,16 +690,9 @@ describe('SyncController - getChangeFeed', function () {
 describe('SyncController - advanceChangeFeedCheckpoint', function () {
 
     test('advances change feed checkpoint', function () {
-        $data = makeLecturerUser('checkpoint-feed-uid');
+        $data = makeLecturerUserWithToken();
 
-        $verifiedToken = [
-            'uid' => 'checkpoint-feed-uid',
-            'email' => 'checkpoint-feed-uid@example.com',
-            'sign_in_provider' => 'password',
-        ];
-        $this->firebaseAuthService->shouldReceive('verifyIdToken')->once()->with('valid-token')->andReturn($verifiedToken);
-
-        $response = $this->withHeader('Authorization', 'Bearer valid-token')
+        $response = $this->withHeaders(authHeaders($data['token']))
             ->postJson('/api/v1/sync/advance-change-feed-checkpoint', [
                 'collection_name' => 'courses',
                 'sequence' => 42,
@@ -841,6 +702,7 @@ describe('SyncController - advanceChangeFeedCheckpoint', function () {
         $response->assertJson([
             'advanced' => true,
             'collection_name' => 'courses',
+            'sequence' => 42,
         ]);
     });
 });

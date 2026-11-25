@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,7 +23,7 @@ class StudentAdmissionReservation extends Model
     protected function casts(): array
     {
         return [
-            'student_record_uuid' => 'uuid',
+            'student_record_uuid' => Uuid::class,
             'reserved_at' => 'datetime',
             'expires_at' => 'datetime',
         ];

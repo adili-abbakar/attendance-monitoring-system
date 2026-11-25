@@ -5,9 +5,10 @@ use App\Http\Controllers\Api\SyncController;
 use App\Http\Controllers\Api\AuthController;
 
 Route::prefix('v1')->group(function () {
-    Route::post('/auth/verify', [AuthController::class, 'verify']);
-    
-    Route::middleware('firebase.auth')->group(function () {
+    Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::post('/auth/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+
+    Route::middleware('auth:sanctum')->group(function () {
         Route::post('/sync/upsert-course', [SyncController::class, 'upsertCourse']);
         Route::post('/sync/upsert-lecture-session', [SyncController::class, 'upsertLectureSession']);
         Route::post('/sync/create-attendance-record', [SyncController::class, 'createAttendanceRecord']);

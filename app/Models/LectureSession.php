@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,7 +31,7 @@ class LectureSession extends Model
     protected function casts(): array
     {
         return [
-            'record_uuid' => 'uuid',
+            'record_uuid' => Uuid::class,
             'lecture_date' => 'date',
             'from_time' => 'datetime:H:i',
             'to_time' => 'datetime:H:i',

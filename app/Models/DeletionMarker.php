@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -27,7 +28,7 @@ class DeletionMarker extends Model
     protected function casts(): array
     {
         return [
-            'record_uuid' => 'uuid',
+            'record_uuid' => Uuid::class,
             'deleted_at' => 'datetime',
             'schema_version' => 'integer',
             'change_version' => 'integer',

@@ -17,8 +17,9 @@ return new class extends Migration
             $table->foreignId('lecture_session_id')->constrained('lecture_sessions')->cascadeOnDelete();
             $table->foreignId('student_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('lecturer_id')->constrained('users')->cascadeOnDelete();
-            $table->enum('status', ['present'])->default('present');
+            $table->enum('status', ['present', 'absent', 'late', 'excused'])->default('present');
             $table->timestamp('scanned_at');
+            $table->unsignedInteger('source_revision')->default(1);
             $table->unsignedInteger('schema_version')->default(1);
             $table->unsignedInteger('change_version')->default(1);
             $table->timestamps();

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ChangeFeed extends Model
 {
     use HasFactory;
+
+    protected $table = 'change_feed';
 
     protected $fillable = [
         'change_id',
@@ -27,7 +30,7 @@ class ChangeFeed extends Model
     protected function casts(): array
     {
         return [
-            'change_id' => 'uuid',
+            'change_id' => Uuid::class,
             'data' => 'array',
             'server_timestamp' => 'datetime',
             'sequence' => 'integer',

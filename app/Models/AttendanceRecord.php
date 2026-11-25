@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,7 @@ class AttendanceRecord extends Model
         'lecturer_id',
         'status',
         'scanned_at',
+        'source_revision',
         'schema_version',
         'change_version',
     ];
@@ -24,8 +26,9 @@ class AttendanceRecord extends Model
     protected function casts(): array
     {
         return [
-            'record_uuid' => 'uuid',
+            'record_uuid' => Uuid::class,
             'scanned_at' => 'datetime',
+            'source_revision' => 'integer',
             'schema_version' => 'integer',
             'change_version' => 'integer',
         ];

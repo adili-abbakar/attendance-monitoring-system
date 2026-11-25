@@ -10,6 +10,7 @@ use App\Models\LectureSession;
 use App\Models\AttendanceRecord;
 use App\Models\Enrolment;
 use App\Models\Lecturer;
+use App\Models\User;
 use App\Models\ChangeFeed;
 use App\Models\ChangeFeedCounter;
 use App\Models\ChangeFeedEventId;
@@ -20,17 +21,19 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class SyncController extends Controller
 {
     protected function getLecturer(Request $request): Lecturer
     {
-        return $request->attributes->get('auth_lecturer');
+        $user = $request->user();
+        return $user->lecturer;
     }
 
     protected function getLecturerUser(Request $request): \App\Models\User
     {
-        return $request->attributes->get('auth_user');
+        return $request->user();
     }
 
     public function upsertCourse(Request $request): JsonResponse
@@ -90,7 +93,7 @@ class SyncController extends Controller
                     ]);
                 }
 
-                $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'courses', $validated['course_id'], 'create', 1);
+                $eventId = $this->computeEventId((string) $lecturerUser->id, 'courses', $validated['course_id'], 'create', 1);
 
                 $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
                 if ($existingEvent) {
@@ -150,9 +153,12 @@ class SyncController extends Controller
             }
 
             if ($course->lecturer_id !== $lecturerUser->id) {
-                throw ValidationException::withMessages([
-                    'course_id' => 'The lecturer must own the course.',
-                ]);
+                throw new HttpException(403, json_encode([
+                    'error' => [
+                        'code' => 'permission-denied',
+                        'message' => 'The lecturer must own the course.',
+                    ],
+                ]));
             }
 
             if (!is_int($course->change_version) || $course->change_version < 1) {
@@ -172,7 +178,7 @@ class SyncController extends Controller
                 ];
             }
 
-            $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'courses', $validated['course_id'], 'update', $validated['source_revision']);
+            $eventId = $this->computeEventId((string) $lecturerUser->id, 'courses', $validated['course_id'], 'update', $validated['source_revision']);
 
             $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
             if ($existingEvent) {
@@ -295,7 +301,7 @@ class SyncController extends Controller
                     ]);
                 }
 
-                $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'lecture_sessions', $validated['record_uuid'], 'create', 1);
+                $eventId = $this->computeEventId((string) $lecturerUser->id, 'lecture_sessions', $validated['record_uuid'], 'create', 1);
 
                 $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
                 if ($existingEvent) {
@@ -369,7 +375,7 @@ class SyncController extends Controller
                 ];
             }
 
-            $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'lecture_sessions', $validated['record_uuid'], 'update', $validated['source_revision']);
+            $eventId = $this->computeEventId((string) $lecturerUser->id, 'lecture_sessions', $validated['record_uuid'], 'update', $validated['source_revision']);
 
             $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
             if ($existingEvent) {
@@ -496,7 +502,7 @@ class SyncController extends Controller
                     ]);
                 }
 
-                $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'attendance_records', $validated['record_uuid'], 'create', 1);
+                $eventId = $this->computeEventId((string) $lecturerUser->id, 'attendance_records', $validated['record_uuid'], 'create', 1);
 
                 $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
                 if ($existingEvent) {
@@ -565,7 +571,7 @@ class SyncController extends Controller
                 ];
             }
 
-            $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'attendance_records', $validated['record_uuid'], 'update', $validated['source_revision']);
+            $eventId = $this->computeEventId((string) $lecturerUser->id, 'attendance_records', $validated['record_uuid'], 'update', $validated['source_revision']);
 
             $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
             if ($existingEvent) {
@@ -654,12 +660,15 @@ class SyncController extends Controller
             }
 
             if ($course->lecturer_id !== $lecturerUser->id) {
-                throw ValidationException::withMessages([
-                    'course_id' => 'The lecturer must own the course.',
-                ]);
+                throw new HttpException(403, json_encode([
+                    'error' => [
+                        'code' => 'permission-denied',
+                        'message' => 'The lecturer must own the course.',
+                    ],
+                ]));
             }
 
-            $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'courses', $validated['course_id'], 'delete', 1);
+            $eventId = $this->computeEventId((string) $lecturerUser->id, 'courses', $validated['course_id'], 'delete', 1);
 
             $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
             if ($existingEvent) {
@@ -698,7 +707,7 @@ class SyncController extends Controller
                 $course->id,
                 'delete',
                 1,
-                null,
+                [],
                 $nextSequence,
                 $eventId,
                 false
@@ -745,7 +754,7 @@ class SyncController extends Controller
                 ]);
             }
 
-            $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'lecture_sessions', $validated['record_uuid'], 'delete', 1);
+            $eventId = $this->computeEventId((string) $lecturerUser->id, 'lecture_sessions', $validated['record_uuid'], 'delete', 1);
 
             $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
             if ($existingEvent) {
@@ -833,7 +842,7 @@ class SyncController extends Controller
                 ]);
             }
 
-            $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'attendance_records', $validated['record_uuid'], 'delete', 1);
+            $eventId = $this->computeEventId((string) $lecturerUser->id, 'attendance_records', $validated['record_uuid'], 'delete', 1);
 
             $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
             if ($existingEvent) {
@@ -943,7 +952,7 @@ class SyncController extends Controller
                     ]);
                 }
 
-                $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'enrolments', $validated['record_uuid'], 'create', 1);
+                $eventId = $this->computeEventId((string) $lecturerUser->id, 'enrolments', $validated['record_uuid'], 'create', 1);
 
                 $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
                 if ($existingEvent) {
@@ -1011,7 +1020,7 @@ class SyncController extends Controller
                 ];
             }
 
-            $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'enrolments', $validated['record_uuid'], 'update', $validated['source_revision']);
+            $eventId = $this->computeEventId((string) $lecturerUser->id, 'enrolments', $validated['record_uuid'], 'update', $validated['source_revision']);
 
             $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
             if ($existingEvent) {
@@ -1104,7 +1113,7 @@ class SyncController extends Controller
                 ]);
             }
 
-            $eventId = $this->computeEventId($lecturerUser->firebase_uid, 'enrolments', $validated['record_uuid'], 'delete', 1);
+            $eventId = $this->computeEventId((string) $lecturerUser->id, 'enrolments', $validated['record_uuid'], 'delete', 1);
 
             $existingEvent = ChangeFeedEventId::where('event_id', $eventId)->first();
             if ($existingEvent) {
@@ -1281,8 +1290,16 @@ class SyncController extends Controller
             'sequence' => 'required|integer|min:0',
         ]);
 
+        $changeFeedDevice = SyncDevice::firstOrCreate(
+            ['device_id' => 'change_feed', 'lecturer_id' => $lecturerUser->id],
+            [
+                'device_info' => 'Change Feed Checkpoint',
+                'schema_version' => 1,
+            ]
+        );
+
         SyncCheckpoint::updateOrCreate(
-            ['device_id' => 'change_feed', 'collection_name' => $validated['collection_name']],
+            ['device_id' => $changeFeedDevice->id, 'collection_name' => $validated['collection_name']],
             [
                 'cursor' => null,
                 'last_page_id' => null,
@@ -1309,7 +1326,7 @@ class SyncController extends Controller
         int $documentId,
         string $operation,
         int $sourceRevision,
-        array $data,
+        ?array $data,
         int $sequence,
         string $eventId,
         bool $eventIdAlreadyExists = false

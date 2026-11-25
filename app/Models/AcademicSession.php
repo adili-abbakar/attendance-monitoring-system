@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -17,7 +18,7 @@ class AcademicSession extends Model
     protected function casts(): array
     {
         return [
-            'record_uuid' => 'uuid',
+            'record_uuid' => Uuid::class,
         ];
     }
 

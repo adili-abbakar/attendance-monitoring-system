@@ -10,6 +10,8 @@ class ChangeFeedEventId extends Model
 {
     use HasFactory;
 
+    public $timestamps = false;
+
     protected $fillable = [
         'event_id',
         'lecturer_id',

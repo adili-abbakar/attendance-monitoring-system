@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,7 +22,7 @@ class SyncDevice extends Model
     protected function casts(): array
     {
         return [
-            'device_id' => 'uuid',
+            'device_id' => Uuid::class,
             'schema_version' => 'integer',
             'last_seen_at' => 'datetime',
         ];

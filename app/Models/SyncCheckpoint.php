@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,8 +22,8 @@ class SyncCheckpoint extends Model
     protected function casts(): array
     {
         return [
-            'cursor' => 'uuid',
-            'last_page_id' => 'uuid',
+            'cursor' => Uuid::class,
+            'last_page_id' => Uuid::class,
             'schema_version' => 'integer',
         ];
     }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\Uuid;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -34,7 +35,7 @@ class Lecturer extends Model
     {
         return [
             'date_of_birth' => 'date',
-            'record_uuid' => 'uuid',
+            'record_uuid' => Uuid::class,
             'schema_version' => 'integer',
             'change_version' => 'integer',
         ];
